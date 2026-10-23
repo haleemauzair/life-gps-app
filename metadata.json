@@ -1,0 +1,6 @@
+{
+  "name": "Life GPS",
+  "description": "An AI-powered life navigation assistant for students that turns personal or academic goals into a realistic, step-by-step route.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

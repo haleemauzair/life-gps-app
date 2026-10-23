@@ -156,7 +156,7 @@ export const RouteFormView: React.FC<RouteFormViewProps> = ({
 
   const loadingStages = [
     'Reading your current coordinates and constraints...',
-    'Plotting 3 to 4 practical milestones with Gemma 4 (gemma-4-31b-it)...',
+    'Plotting 3 to 4 practical milestones with Gemma 4 (gemma-4-26b-a4b-it)...',
     'Designing a realistic 7-day plan that fits your weekly hours...',
     'Preparing alternate routes around your roadblocks...',
   ];
@@ -479,7 +479,7 @@ export const RouteFormView: React.FC<RouteFormViewProps> = ({
               <div>
                 <p className="font-semibold text-[#0F172A]">{loadingStages[loadingStageIndex]}</p>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Generating personalized route with Gemma 4 (gemma-4-31b-it)...
+                  Generating your route with Gemma 4 (gemma-4-26b-a4b-it). This usually takes 30–40 seconds.
                 </p>
               </div>
             </div>

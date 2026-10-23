@@ -9,6 +9,7 @@ import {
   Clock,
   Compass,
   CornerDownRight,
+  Download,
   Flag,
   MapPin,
   RefreshCw,
@@ -48,6 +49,7 @@ export const RouteDashboardView: React.FC<RouteDashboardViewProps> = ({
 }) => {
   const [isRecalcModalOpen, setIsRecalcModalOpen] = useState(false);
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
+  const [isExported, setIsExported] = useState(false);
 
   const actionableDays = route.sevenDayPlan.filter((d) => !d.isRestOrLightDay);
   const totalTrackableSteps = 1 + route.milestones.length + actionableDays.length;
@@ -90,6 +92,44 @@ export const RouteDashboardView: React.FC<RouteDashboardViewProps> = ({
   const handleRecalcSubmit = async (updatedInput: RouteFormInput) => {
     await onRecalculate(updatedInput);
     setIsRecalcModalOpen(false);
+  };
+
+  const handleExportJSON = () => {
+    const exportPayload = {
+      exportedAt: new Date().toISOString(),
+      application: 'Life GPS',
+      progress: {
+        overallPercent,
+        completedSteps: completedTotal,
+        totalTrackableSteps,
+        completionState,
+        completedSummary,
+      },
+      route,
+    };
+
+    const slug = (route.destination.concreteDestination || route.destination.statedGoal || 'route')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40);
+    const dateStamp = new Date().toISOString().split('T')[0];
+    const fileName = `life-gps-${slug || 'route'}-${dateStamp}.json`;
+
+    const jsonString = JSON.stringify(exportPayload, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setIsExported(true);
+    setTimeout(() => setIsExported(false), 2500);
   };
 
   return (
@@ -149,8 +189,27 @@ export const RouteDashboardView: React.FC<RouteDashboardViewProps> = ({
             </h1>
           </div>
 
-          {/* Action Buttons: Recalculate & Start Over */}
+          {/* Action Buttons: Export JSON, Recalculate & Start Over */}
           <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={handleExportJSON}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold text-[#1E3A8A] bg-[#F8FAFC] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors cursor-pointer whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06B6D4]"
+              title="Download your personalized route and progress as a JSON file"
+            >
+              {isExported ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-600" aria-hidden="true" />
+                  <span className="text-emerald-700">Exported JSON</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 text-[#06B6D4]" aria-hidden="true" />
+                  <span>Export JSON</span>
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={handleOpenRecalc}

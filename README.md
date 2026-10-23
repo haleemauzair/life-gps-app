@@ -34,7 +34,14 @@ Instead of acting like a generic chatbot or motivational poster, Life GPS treats
 
 ```text
 /
-├── server.ts                  # Express server & server-side @google/genai (gemma-4-26b-a4b-it) endpoint
+├── server.ts                  # Express server for local dev / AI Studio (uses lib/routeEngine.js)
+├── lib/
+│   ├── routeEngine.js         # Shared Gemma 4 prompt, retry/fallback and validation logic
+│   └── cors.js                # CORS allow-list for the Vercel functions
+├── api/
+│   ├── route/generate.js      # Vercel function: POST /api/route/generate
+│   └── health.js              # Vercel function: GET /api/health
+├── vercel.json                # Vercel build + function settings
 ├── src/
 │   ├── App.tsx                # Application state, view routing, and localStorage sync
 │   ├── components/
@@ -94,23 +101,28 @@ npm start
 
 ---
 
-## Deployment & Hosting (Full-Stack vs. GitHub Pages)
+## Deployment & Hosting
 
-Life GPS is a **full-stack application** consisting of a React/Vite frontend and a Node.js/Express backend (`server.ts`) that securely calls `gemma-4-31b-it` using your server-side `GEMINI_API_KEY`.
+Life GPS has two parts: a React/Vite frontend and a small backend that calls Gemma 4 with a server-side `GEMINI_API_KEY`. The route logic lives in `lib/routeEngine.js` and is shared by both backends below, so they behave identically.
 
-1. **Google AI Studio / Node.js Hosting (Recommended):**
-   - Run the complete app in Google AI Studio Build or deploy `server.ts` to a Node.js host (Cloud Run, Render, Railway, Fly.io) with `GEMINI_API_KEY` set as a server environment variable.
-   - Both the UI and `POST /api/route/generate` run on the same origin.
-2. **GitHub Pages (`https://haleemauzair.github.io/life-gps-app/`):**
-   - GitHub Pages is a **static file host** and cannot execute the Node.js backend (`server.ts`). Sending a `POST` request to `/api/route/generate` on GitHub Pages without a separate backend returns `HTTP 405 (Method Not Allowed)`.
-   - To use a GitHub Pages frontend with live AI route generation, host `server.ts` on a Node.js service and set `VITE_API_BASE_URL="https://your-nodejs-backend.example.com"` when running `npm run build` for GitHub Pages.
+| Where | Frontend | Backend | Notes |
+|---|---|---|---|
+| **Vercel** (free Hobby plan) | `vite build` → `dist/` | `api/route/generate.js`, `api/health.js` (serverless functions) | Full app on one URL. Set `GEMINI_API_KEY` in Vercel → Project → Settings → Environment Variables, then redeploy. |
+| **GitHub Pages** (`https://haleemauzair.github.io/life-gps-app/`) | Built by `.github/workflows/deploy.yml` | None (static host) — calls the Vercel backend | The workflow passes `VITE_API_BASE_URL` (the Vercel URL) into the build. Override it with a repository variable named `VITE_API_BASE_URL`. |
+| **Local / Google AI Studio** | Vite middleware | `server.ts` (Express) | `npm run dev`, key from `.env` or the AI Studio Secrets panel. |
+
+**Why GitHub Pages alone returns HTTP 405:** GitHub Pages only serves static files and rejects `POST` requests, so `/api/route/generate` can't run there. The Pages build therefore points at the Vercel backend.
+
+**CORS:** the Vercel functions accept browser requests from `https://haleemauzair.github.io`, the Vercel domain itself, and `localhost`. Add more origins (e.g. a custom domain) with a comma-separated `ALLOWED_ORIGINS` environment variable on Vercel.
+
+**Health check:** `GET <backend>/api/health` returns `apiKeyConfigured: true|false` (never the key).
 
 ---
 
 ## AI Model & Gemini API Integration
 
 - **Model Used:** **Gemma 4** (`gemma-4-31b-it`, with automatic retry and fallback support for `gemma-4-26b-a4b-it`), an open-weight model family by Google, accessed server-side through the **Gemini API** using the official `@google/genai` JavaScript SDK (`new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })` and `ai.models.generateContent({ model: "gemma-4-31b-it", contents: prompt })`).
-- **Server-Side Security:** API credentials (`GEMINI_API_KEY`) are read exclusively inside `server.ts`. No API keys or SDK calls ever appear in client-side code or Git commits.
+- **Server-Side Security:** API credentials (`GEMINI_API_KEY`) are read exclusively on the server (`lib/routeEngine.js`, used by `server.ts` and the Vercel functions). No API keys or SDK calls ever appear in client-side code or Git commits.
 - **Resilient Error Handling:** Includes up to 2 short-delay retries for transient upstream HTTP 500 errors and preserves all entered student inputs if an error occurs so you can retry without losing work.
 - **Guidance Disclaimer:** Generated routes are practical planning aids, not guaranteed academic, financial, or career outcomes. Students should always independently verify real-world scholarship eligibility, tuition costs, application links, and deadlines.
 

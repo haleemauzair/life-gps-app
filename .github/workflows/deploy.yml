@@ -32,6 +32,11 @@ jobs:
 
       - name: Build static site for GitHub Pages
         run: npm run build:gh-pages
+        env:
+          # GitHub Pages can't run server.ts, so the static site calls the Vercel
+          # backend (api/route/generate.js) instead. Override by setting a repository
+          # variable named VITE_API_BASE_URL (Settings → Secrets and variables → Actions → Variables).
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3

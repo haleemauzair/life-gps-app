@@ -341,7 +341,7 @@ async function startServer() {
   app.use(express.json({ limit: '1mb' }));
 
   // Allow cross-origin requests to /api/* when the frontend is hosted separately (e.g. GitHub Pages pointing VITE_API_BASE_URL to this Node.js backend)
-  app.use('/api', (req: Request, res: Response, next) => {
+  app.use(['/api', '/life-gps-app/api'], (req: Request, res: Response, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
@@ -352,7 +352,7 @@ async function startServer() {
     next();
   });
 
-  app.get('/api/health', (_req: Request, res: Response) => {
+  app.get(['/api/health', '/life-gps-app/api/health'], (_req: Request, res: Response) => {
     const hasKey = Boolean(
       process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY'
     );
@@ -364,7 +364,7 @@ async function startServer() {
     });
   });
 
-  app.post('/api/route/generate', async (req: Request, res: Response) => {
+  app.post(['/api/route/generate', '/life-gps-app/api/route/generate'], async (req: Request, res: Response) => {
     try {
       const { goal, currentSituation, biggestObstacle, timeAvailable } = req.body || {};
 
@@ -428,7 +428,7 @@ async function startServer() {
     }
   });
 
-  app.all('/api/route/generate', (req: Request, res: Response) => {
+  app.all(['/api/route/generate', '/life-gps-app/api/route/generate'], (req: Request, res: Response) => {
     res.status(405).json({
       error: `Method ${req.method} not allowed on /api/route/generate. Use POST with JSON body.`,
     });
@@ -449,6 +449,7 @@ async function startServer() {
   } else {
     const distPath = path.join(__dirname, 'dist');
     app.use(express.static(distPath));
+    app.use('/life-gps-app', express.static(distPath));
     app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

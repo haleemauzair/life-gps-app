@@ -6,9 +6,9 @@ import {defineConfig} from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(({command}) => {
+export default defineConfig(() => {
   return {
-    base: command === 'build' ? '/life-gps-app/' : '/',
+    base: process.env.GITHUB_PAGES === 'true' ? '/life-gps-app/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
@@ -334,6 +335,7 @@ function extractAndValidateRoute(
 
 async function startServer() {
   const app = express();
+  const httpServer = http.createServer(app);
   const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '1mb' }));
@@ -436,8 +438,10 @@ async function startServer() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: false,
-        watch: process.env.DISABLE_HMR === 'true' ? null : undefined,
+        allowedHosts: true,
+        ws: {
+          server: httpServer,
+        },
       },
       appType: 'spa',
     });
@@ -450,7 +454,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(
       `Life GPS server running on http://0.0.0.0:${PORT} using primary model ${PRIMARY_MODEL_ID}`
     );

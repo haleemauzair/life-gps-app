@@ -2,134 +2,144 @@
 
 > *You don't need your whole life figured out. You just need your next turn.*
 
-**Life GPS** is an AI-powered life navigation assistant designed for university students, recent graduates, and young people who have ambitions—such as landing a first internship, applying for scholarships, improving semester grades, learning a technical skill, or building a startup prototype—but feel overwhelmed by the distance between where they are and where they want to go.
+**Life GPS helps overwhelmed university students turn one goal into a realistic, step-by-step route, using Gemma 4.**
 
-Instead of acting like a generic chatbot or motivational poster, Life GPS treats personal and academic planning like a real navigation system:
-- **Destination:** Your goal restated into a concrete, navigable outcome.
-- **Current Location:** An honest, judgment-free reading of where you are starting from based strictly on what you share.
-- **The Route Ahead:** 3 to 6 connected, realistic milestones calibrated to your actual weekly time budget.
-- **Your Next Turn:** The single most useful action small enough to complete today.
-- **Your Seven-Day Route:** A day-by-day schedule for the coming week that respects rest and coursework load.
-- **Roadblocks & Alternate Routes:** Practical detours around financial, time, or experience constraints.
-- **Recalculation:** One-click route recalculation when exams, work, or unexpected roadblocks change your week.
+A student describes where they want to go (a first internship, a scholarship application, better grades, a new skill), where they are now, what's blocking them, and how many hours a week they actually have. Gemma 4 turns that into a route sized to their real time budget, starting with one step small enough to do today.
 
----
-
-## Core Features
-
-1. **Calm, Reassuring Landing Experience:** Explains the Life GPS philosophy with a native SVG route schematic, direct navigation to route planning, and an interactive sample journey preview.
-2. **Guided Route-Planning Conversation:** Collects five key coordinates (Destination, Starting Point, Biggest Roadblock, Weekly Time Commitment, and Optional Context) with quick-select presets, validation, and automatic draft persistence.
-3. **Server-Side Gemma 4 Route Generation:** Uses Google's official `@google/genai` SDK on an Express server (`server.ts`) to call the open model `gemma-4-26b-a4b-it`, returning validated structured JSON.
-4. **Interactive Navigation Dashboard:** Displays your Next Turn, Destination, Current Location, Connected Milestones, 7-Day Plan, Roadblock Detours, Progress Indicators, and Navigator Note.
-5. **Persistent Progress & Route Recalculation:** Check off your Next Turn, milestones, and daily tasks with automatic `localStorage` persistence. Click **Recalculate my route** anytime your weekly hours or obstacles shift.
+| | |
+|---|---|
+| **Live app** | https://haleemauzair.github.io/life-gps-app/ |
+| **Backend health check** | https://life-gps-app.vercel.app/api/health |
+| **Model** | Gemma 4 (`gemma-4-31b-it`, falls back to `gemma-4-26b-a4b-it`) via the Gemini API |
+| **Model license** | [Apache 2.0](https://ai.google.dev/gemma/apache_2) · [Gemma 4 model card](https://ai.google.dev/gemma/docs/core/model_card_4) |
+| **Code license** | [MIT](./LICENSE) |
 
 ---
 
-## Architecture & Tech Stack
+## The problem
 
-- **Frontend:** React 19, TypeScript, Tailwind CSS v4, Lucide React icons.
-- **Backend:** Node.js + Express (`server.ts`) with Vite middleware in development and static asset serving in production.
-- **AI Model & SDK:** `gemma-4-26b-a4b-it` invoked strictly on the server via `@google/genai` (`^2.4.0`).
-- **Storage:** Browser `localStorage` for persisting generated routes, checkbox progress, and form drafts across refreshes.
+Students with ambitions often don't lack motivation; they lack a route. The distance between "I want a remote internship" and "what do I do tonight?" is where people stall. Generic planners and chatbots either produce motivational filler or plans that assume 20 free hours a week. Life GPS plans around the time and constraints a student actually has.
+
+## What it does
+
+The student enters five things: **destination** (goal), **starting point**, **biggest roadblock**, **weekly hours**, and optional context. Life GPS returns:
+
+- **Destination:** the goal restated as a concrete, reachable outcome
+- **Current location:** a summary built only from what the student shared, with strengths and open questions
+- **Your next turn:** one 15–45 minute action with a clear definition of done
+- **The route:** 3–4 connected milestones, each with a deliverable
+- **Seven-day plan:** a day-by-day schedule whose total fits the stated weekly hours, including rest days
+- **Roadblocks and alternate routes:** practical detours, each with a note on what to verify independently
+- **Progress indicators:** two measurable signals to track
+
+Progress (checked-off steps) is saved in the browser. **Recalculate my route** regenerates the plan when exams, work or obstacles change.
+
+---
+
+## How Gemma 4 is used
+
+Gemma 4 does the core work: every personalized route is generated by Gemma 4, with no template or rule-based fallback. The only other route in the app is a fixed sample, behind its own "explore a sample" button, so visitors can see the format before entering anything.
+
+1. The frontend sends the student's five inputs to the backend (`POST /api/route/generate`).
+2. The backend (`lib/routeEngine.js`) builds a prompt with Life GPS's planning rules:
+   - fit the plan inside the student's stated weekly hours
+   - never invent scholarships, deadlines, URLs or credentials
+   - describe the student using only what they shared
+   - no motivational clichés
+3. It calls **`gemma-4-31b-it`** through the **Gemini API** using Google's official [`@google/genai`](https://www.npmjs.com/package/@google/genai) SDK. Temporary 500/503 errors are retried twice. If the 31B model still fails, it falls back to **`gemma-4-26b-a4b-it`**.
+4. Gemma 4's JSON answer is parsed and validated: at least 3 milestones and a full 7-day plan, with every field normalized to the expected shape. Only then is it sent to the browser.
+
+| Model | Type | Parameters | Role |
+|---|---|---|---|
+| `gemma-4-31b-it` | Dense, instruction-tuned | 30.7B | Primary |
+| `gemma-4-26b-a4b-it` | Mixture-of-Experts, instruction-tuned | 25.2B total, 3.8B active | Fallback |
+
+Both are open-weight Gemma 4 models released by Google under the [Apache 2.0 license](https://ai.google.dev/gemma/apache_2). Parameter counts are from the [Gemma 4 model card](https://ai.google.dev/gemma/docs/core/model_card_4). By the challenge's definition (more than 10B parameters), both are large language models.
+
+The API key (`GEMINI_API_KEY`) is read only on the server. It never appears in the frontend, in the repository, or in Git history.
+
+---
+
+## Architecture
+
+```text
+Browser (GitHub Pages, static React app)
+        │  POST /api/route/generate  (JSON: goal, situation, roadblock, hours)
+        ▼
+Vercel serverless function  api/route/generate.js
+        │  lib/routeEngine.js: prompt → Gemma 4 → validate JSON
+        ▼
+Gemini API  →  gemma-4-31b-it  (fallback: gemma-4-26b-a4b-it)
+```
+
+GitHub Pages can only serve static files, so the backend runs as a Vercel serverless function. The frontend is built with `VITE_API_BASE_URL=https://life-gps-app.vercel.app`, which is set in `.github/workflows/deploy.yml`. The backend only accepts browser requests from `https://haleemauzair.github.io`, its own domain and `localhost`. Requests from other websites get HTTP 403.
 
 ```text
 /
-├── server.ts                  # Express server for local dev / AI Studio (uses lib/routeEngine.js)
 ├── lib/
-│   ├── routeEngine.js         # Shared Gemma 4 prompt, retry/fallback and validation logic
-│   └── cors.js                # CORS allow-list for the Vercel functions
+│   ├── routeEngine.js         # Gemma 4 prompt, retry/fallback, JSON validation (shared)
+│   └── cors.js                # Allowed origins for the Vercel functions
 ├── api/
 │   ├── route/generate.js      # Vercel function: POST /api/route/generate
-│   └── health.js              # Vercel function: GET /api/health
-├── vercel.json                # Vercel build + function settings
+│   └── health.js              # Vercel function: GET /api/health (reports whether a key is configured, never the key)
+├── server.ts                  # Express server for local development (same engine)
 ├── src/
-│   ├── App.tsx                # Application state, view routing, and localStorage sync
-│   ├── components/
-│   │   ├── Navbar.tsx         # 3-zone top navigation bar
-│   │   ├── LandingView.tsx    # Welcome view + native SVG navigation schematic
-│   │   ├── RouteFormView.tsx  # Guided student coordinate input form
-│   │   ├── RouteDashboardView.tsx # Full 8-section route navigation dashboard
-│   │   └── RecalculateModal.tsx   # Modal for revising constraints & recalculating routes
-│   ├── data/
-│   │   └── sampleJourney.ts   # Interactive sample journey preview
-│   ├── services/
-│   │   └── routeApi.ts        # Frontend HTTP client for /api/route/generate
-│   ├── types/
-│   │   └── route.ts           # Shared TypeScript interfaces
-│   └── utils/
-│       └── storage.ts         # Browser localStorage helpers
-├── .env.example               # Placeholder environment variables (no secrets)
-├── LICENSE                    # MIT License (Apache-2.0 compatible)
-└── package.json
+│   ├── App.tsx                # App state, view switching, localStorage sync
+│   ├── components/            # Landing page, route form, dashboard, recalculation modal
+│   ├── services/routeApi.ts   # Frontend client for /api/route/generate
+│   ├── data/sampleJourney.ts  # Sample route shown before you generate your own
+│   ├── types/route.ts         # Shared TypeScript types
+│   └── utils/storage.ts       # localStorage helpers
+├── .github/workflows/deploy.yml  # Builds and deploys the frontend to GitHub Pages
+├── vercel.json                # Vercel build and function settings
+├── .env.example               # Placeholder variables (no secrets)
+└── LICENSE                    # MIT
 ```
+
+### Key dependencies
+
+| Package | Purpose |
+|---|---|
+| [`@google/genai`](https://www.npmjs.com/package/@google/genai) | Official Google SDK for calling Gemma 4 through the Gemini API |
+| React 19 + TypeScript | Frontend |
+| Vite | Frontend build |
+| Tailwind CSS v4, `lucide-react`, `motion` | Styling, icons, animation |
+| Express + `tsx` | Local development server |
 
 ---
 
-## Setup & Running Locally
+## Run it locally
 
-### Prerequisites
-- Node.js 20+ and npm
-- A Gemini API key with access to `gemma-4-26b-a4b-it`
+You need Node.js 20+ and a Gemini API key from [Google AI Studio](https://aistudio.google.com/).
 
-### 1. Install dependencies
 ```bash
-npm install
+git clone https://github.com/haleemauzair/life-gps-app.git
+cd life-gps-app
+npm install --legacy-peer-deps
+cp .env.example .env        # then set GEMINI_API_KEY in .env
+npm run dev                 # http://localhost:3000
 ```
 
-### 2. Configure environment variables
-Copy `.env.example` to `.env` and add your Gemini API key:
-```bash
-cp .env.example .env
-```
-Edit `.env`:
-```env
-GEMINI_API_KEY="your_actual_gemini_api_key_here"
-```
-*(In Google AI Studio Build, `GEMINI_API_KEY` is automatically injected on the server from the Secrets panel. Never commit `.env` or real API keys to source control.)*
+`.env` is in `.gitignore`, so your key stays on your machine.
 
-### 3. Start the full-stack development server
-```bash
-npm run dev
-```
-The server starts on `http://localhost:3000`.
+## Deploy
 
-### 4. Build for production
-```bash
-npm run build
-npm start
-```
+| Part | Where | How |
+|---|---|---|
+| Frontend | GitHub Pages | Every push to `main` runs `.github/workflows/deploy.yml` |
+| Backend | Vercel (free Hobby plan) | Deploy `api/` and `lib/`, and set `GEMINI_API_KEY` in Vercel → Project → Settings → Environment Variables |
+
+To allow another frontend domain, add it to the `ALLOWED_ORIGINS` environment variable on Vercel (comma-separated).
 
 ---
 
-## Deployment & Hosting
+## Limitations
 
-Life GPS has two parts: a React/Vite frontend and a small backend that calls Gemma 4 with a server-side `GEMINI_API_KEY`. The route logic lives in `lib/routeEngine.js` and is shared by both backends below, so they behave identically.
-
-| Where | Frontend | Backend | Notes |
-|---|---|---|---|
-| **Vercel** (free Hobby plan) | `vite build` → `dist/` | `api/route/generate.js`, `api/health.js` (serverless functions) | Full app on one URL. Set `GEMINI_API_KEY` in Vercel → Project → Settings → Environment Variables, then redeploy. |
-| **GitHub Pages** (`https://haleemauzair.github.io/life-gps-app/`) | Built by `.github/workflows/deploy.yml` | None (static host) — calls the Vercel backend | The workflow passes `VITE_API_BASE_URL` (the Vercel URL) into the build. Override it with a repository variable named `VITE_API_BASE_URL`. |
-| **Local / Google AI Studio** | Vite middleware | `server.ts` (Express) | `npm run dev`, key from `.env` or the AI Studio Secrets panel. |
-
-**Why GitHub Pages alone returns HTTP 405:** GitHub Pages only serves static files and rejects `POST` requests, so `/api/route/generate` can't run there. The Pages build therefore points at the Vercel backend.
-
-**CORS:** the Vercel functions accept browser requests from `https://haleemauzair.github.io`, the Vercel domain itself, and `localhost`. Add more origins (e.g. a custom domain) with a comma-separated `ALLOWED_ORIGINS` environment variable on Vercel.
-
-**Health check:** `GET <backend>/api/health` returns `apiKeyConfigured: true|false` (never the key).
-
----
-
-## AI Model & Gemini API Integration
-
-- **Model Used:** **Gemma 4** (`gemma-4-31b-it`, with automatic retry and fallback support for `gemma-4-26b-a4b-it`), an open-weight model family by Google, accessed server-side through the **Gemini API** using the official `@google/genai` JavaScript SDK (`new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })` and `ai.models.generateContent({ model: "gemma-4-31b-it", contents: prompt })`).
-- **Server-Side Security:** API credentials (`GEMINI_API_KEY`) are read exclusively on the server (`lib/routeEngine.js`, used by `server.ts` and the Vercel functions). No API keys or SDK calls ever appear in client-side code or Git commits.
-- **Resilient Error Handling:** Includes up to 2 short-delay retries for transient upstream HTTP 500 errors and preserves all entered student inputs if an error occurs so you can retry without losing work.
-- **Guidance Disclaimer:** Generated routes are practical planning aids, not guaranteed academic, financial, or career outcomes. Students should always independently verify real-world scholarship eligibility, tuition costs, application links, and deadlines.
-
----
+- Routes are planning aids, not guaranteed academic, financial or career outcomes. Life GPS tells students to verify scholarship eligibility, costs, links and deadlines themselves, and the model is instructed not to invent them.
+- Progress is stored in the browser (`localStorage`), so it doesn't sync across devices.
+- Each route is one Gemma 4 call; generation usually takes several seconds.
 
 ## License
 
-- **Application Source Code:** Licensed under the **Apache-2.0** / **MIT** open-source license (Apache-2.0 compatible). See the [LICENSE](./LICENSE) file for details.
-- **Model License:** Gemma 4 (`gemma-4-26b-a4b-it`) is distributed by Google under the Apache-2.0 open-source license.
-
+- **Code:** [MIT](./LICENSE)
+- **Model:** Gemma 4 is released by Google under the [Apache 2.0 license](https://ai.google.dev/gemma/apache_2).

@@ -94,6 +94,19 @@ npm start
 
 ---
 
+## Deployment & Hosting (Full-Stack vs. GitHub Pages)
+
+Life GPS is a **full-stack application** consisting of a React/Vite frontend and a Node.js/Express backend (`server.ts`) that securely calls `gemma-4-31b-it` using your server-side `GEMINI_API_KEY`.
+
+1. **Google AI Studio / Node.js Hosting (Recommended):**
+   - Run the complete app in Google AI Studio Build or deploy `server.ts` to a Node.js host (Cloud Run, Render, Railway, Fly.io) with `GEMINI_API_KEY` set as a server environment variable.
+   - Both the UI and `POST /api/route/generate` run on the same origin.
+2. **GitHub Pages (`https://haleemauzair.github.io/life-gps-app/`):**
+   - GitHub Pages is a **static file host** and cannot execute the Node.js backend (`server.ts`). Sending a `POST` request to `/api/route/generate` on GitHub Pages without a separate backend returns `HTTP 405 (Method Not Allowed)`.
+   - To use a GitHub Pages frontend with live AI route generation, host `server.ts` on a Node.js service and set `VITE_API_BASE_URL="https://your-nodejs-backend.example.com"` when running `npm run build` for GitHub Pages.
+
+---
+
 ## AI Model & Gemini API Integration
 
 - **Model Used:** **Gemma 4** (`gemma-4-31b-it`, with automatic retry and fallback support for `gemma-4-26b-a4b-it`), an open-weight model family by Google, accessed server-side through the **Gemini API** using the official `@google/genai` JavaScript SDK (`new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })` and `ai.models.generateContent({ model: "gemma-4-31b-it", contents: prompt })`).

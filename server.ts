@@ -334,9 +334,21 @@ function extractAndValidateRoute(
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '1mb' }));
+
+  // Allow cross-origin requests to /api/* when the frontend is hosted separately (e.g. GitHub Pages pointing VITE_API_BASE_URL to this Node.js backend)
+  app.use('/api', (req: Request, res: Response, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
 
   app.get('/api/health', (_req: Request, res: Response) => {
     const hasKey = Boolean(
@@ -414,9 +426,19 @@ async function startServer() {
     }
   });
 
+  app.all('/api/route/generate', (req: Request, res: Response) => {
+    res.status(405).json({
+      error: `Method ${req.method} not allowed on /api/route/generate. Use POST with JSON body.`,
+    });
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+        watch: process.env.DISABLE_HMR === 'true' ? null : undefined,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
